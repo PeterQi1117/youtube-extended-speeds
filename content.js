@@ -9,25 +9,43 @@
         if (root.children) for (const el of root.children) if (el.shadowRoot) r.push(...findMenus(el.shadowRoot));
         return r;
     }
-    function addSpeeds(menu) {
-        if (menu.querySelector('[data-custom-speed]')) return;
-        const items = [...menu.querySelectorAll('.ytp-menuitem')];
-        const nums = items.filter(i => /^([0-9.]+|Normal)$/.test(i.querySelector('.ytp-menuitem-label')?.textContent.trim()));
-        const last = nums.at(-1);
-        [...speedsToAdd].reverse().forEach(speed => {
-            if (items.some(i => i.querySelector('.ytp-menuitem-label')?.textContent.trim() == String(speed))) return;
-            const btn = last.cloneNode(true);
-            btn.setAttribute('data-custom-speed', speed);
-            btn.querySelector('.ytp-menuitem-label').textContent = String(speed);
-            btn.setAttribute('aria-checked', 'false');
-            const btnClone = btn.cloneNode(true);
-            btnClone.addEventListener('click', () => {
-                document.querySelectorAll('video').forEach(v => v.playbackRate = speed);
-                menu.querySelectorAll('.ytp-menuitem').forEach(b => b.setAttribute('aria-checked', 'false'));
-                btnClone.setAttribute('aria-checked', 'true');
-            });
-            last.parentNode.insertBefore(btnClone, last.nextSibling);
+    function updateCheckmarks(menu, current) {
+        menu.querySelectorAll('[data-custom-speed]').forEach(btn => {
+            const speed = parseFloat(btn.querySelector('.ytp-menuitem-label').textContent);
+            btn.setAttribute('aria-checked', speed === current ? 'true' : 'false');
         });
+        menu.querySelectorAll('.ytp-menuitem').forEach(item => {
+            const label = item.querySelector('.ytp-menuitem-label');
+            if (!label) return;
+            const speed = parseFloat(label.textContent);
+            if (!isNaN(speed)) item.setAttribute('aria-checked', speed === current ? 'true' : 'false');
+            else if (label.textContent.trim() === 'Normal') item.setAttribute('aria-checked', current === 1 ? 'true' : 'false');
+        });
+    }
+    function addSpeeds(menu) {
+        const video = document.querySelector('video');
+        const current = video ? video.playbackRate : 1;
+        if (!menu.querySelector('[data-custom-speed]')) {
+            const items = [...menu.querySelectorAll('.ytp-menuitem')];
+            const nums = items.filter(i => /^([0-9.]+|Normal)$/.test(i.querySelector('.ytp-menuitem-label')?.textContent.trim()));
+            const last = nums.at(-1);
+            [...speedsToAdd].reverse().forEach(speed => {
+                if (items.some(i => i.querySelector('.ytp-menuitem-label')?.textContent.trim() == String(speed))) return;
+                const btn = last.cloneNode(true);
+                btn.setAttribute('data-custom-speed', speed);
+                btn.querySelector('.ytp-menuitem-label').textContent = String(speed);
+                btn.setAttribute('aria-checked', speed === current ? 'true' : 'false');
+                const btnClone = btn.cloneNode(true);
+                btnClone.addEventListener('click', () => {
+                    document.querySelectorAll('video').forEach(v => v.playbackRate = speed);
+                    setTimeout(() => {
+                        updateCheckmarks(menu, speed);
+                    }, 50);
+                });
+                last.parentNode.insertBefore(btnClone, last.nextSibling);
+            });
+        }
+        updateCheckmarks(menu, current);
     }
     const observer = new MutationObserver(() => {
         for (const menu of findMenus()) {
