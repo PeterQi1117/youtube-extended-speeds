@@ -1,36 +1,30 @@
-// Adds 2.5x and 3x speeds to YouTube's speed menu
+// ==UserScript==
+// @name         YouTube Custom Speeds Injector
+// @description  Adds 2.5x and 3x speeds to YouTube's speed menu
+// ==/UserScript==
 (function () {
     console.log('[YT Speed Ext] Content script loaded.');
-    const speedsToAdd = [3, 4];
-    let lastMenu = null;
+    const speedsToAdd = [2.5, 3];
 
-    // Recursively search for .ytp-panel-menu in shadow roots
-    function findPanelMenus(root=document) {
+    // Recursively find .ytp-panel-menu in light/shadow DOM
+    function findPanelMenus(root = document) {
         let results = [];
-        // Search in the current root
-        if (root.querySelectorAll) {
-            results = Array.from(root.querySelectorAll('.ytp-panel-menu'));
-        }
-        // Search in shadow roots of all elements
+        if (root.querySelectorAll) results = Array.from(root.querySelectorAll('.ytp-panel-menu'));
         if (root.children) {
             for (const el of root.children) {
-                if (el.shadowRoot) {
-                    results = results.concat(findPanelMenus(el.shadowRoot));
-                }
+                if (el.shadowRoot) results = results.concat(findPanelMenus(el.shadowRoot));
             }
         }
         return results;
     }
 
     function addCustomSpeeds(submenu) {
-        // Only inject if not already injected
         if (submenu.querySelector('[data-custom-speed]')) {
             console.log('[YT Speed Ext] Custom speeds already present, skipping injection.');
             return;
         }
         const speedItems = Array.from(submenu.querySelectorAll('.ytp-menuitem'));
         console.log('[YT Speed Ext] Speed menu items found:', speedItems.length, speedItems.map(i => i.textContent.trim()));
-        // Filter out 'Custom (N)' and only keep pure numbers or 'Normal'
         const numericItems = speedItems.filter(item => {
             const label = item.querySelector('.ytp-menuitem-label');
             if (!label) return false;
@@ -121,22 +115,4 @@
         }
     }
     observePlaybackSpeedSubmenu();
-
-    // Fallback: poll for the speed menu every second if MutationObserver fails
-    setInterval(() => {
-        // Poll through both normal DOM and shadow DOM
-        const panelMenus = findPanelMenus(document);
-        if (panelMenus.length === 0) {
-            console.log('[YT Speed Ext] [poll] No .ytp-panel-menu found in light DOM or shadow DOM.');
-        }
-        for (const menu of panelMenus) {
-            if (menu.offsetParent !== null) {
-                const labels = Array.from(menu.querySelectorAll('.ytp-menuitem-label'));
-                if (labels.length > 0 && labels.every(l => /^([0-9.]+|Normal)$/.test(l.textContent.trim()))) {
-                    console.log('[YT Speed Ext] [poll] Detected visible playback speed submenu:', labels.map(l => l.textContent.trim()));
-                    addCustomSpeeds(menu);
-                }
-            }
-        }
-    }, 1000);
 })();
