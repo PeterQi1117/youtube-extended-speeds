@@ -73,7 +73,6 @@
                 document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'}));
             });
             lastNumeric.parentNode.insertBefore(newBtnClone, lastNumeric.nextSibling);
-            console.log(`[YT Speed Ext] Injected custom speed: ${speed}x`);
         });
         console.log('[YT Speed Ext] Custom speeds injected into HTML5 player menu.');
     }
