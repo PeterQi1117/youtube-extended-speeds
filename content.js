@@ -48,16 +48,25 @@
         updateCheckmarks(menu, current);
     }
     const observer = new MutationObserver(() => {
+        const video = document.querySelector('video');
+        const current = video ? video.playbackRate : 1;
         for (const menu of findMenus()) {
             const labels = [...menu.querySelectorAll('.ytp-menuitem-label')].map(l => l.textContent.trim());
             const nums = labels.filter(t => /^([0-9.]+|Normal)$/.test(t));
             if (nums.length >= 5 && nums.includes('2')) addSpeeds(menu);
+
+            // Update the parent menu's "Playback speed" value
+            menu.querySelectorAll('.ytp-menuitem').forEach(item => {
+                const label = item.querySelector('.ytp-menuitem-label');
+                const content = item.querySelector('.ytp-menuitem-content');
+                if (label && content && label.textContent.trim() === 'Playback speed') {
+                    const desired = current === 1 ? 'Normal' : current + '';
+                    if (content.textContent !== desired) {
+                        content.textContent = desired;
+                    }
+                }
+            });
         }
     });
     observer.observe(document.body, { childList: true, subtree: true });
-    for (const menu of findMenus()) {
-        const labels = [...menu.querySelectorAll('.ytp-menuitem-label')].map(l => l.textContent.trim());
-        const nums = labels.filter(t => /^([0-9.]+|Normal)$/.test(t));
-        if (nums.length >= 5 && nums.includes('2')) addSpeeds(menu);
-    }
 })();
