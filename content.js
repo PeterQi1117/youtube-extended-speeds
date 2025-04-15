@@ -1,7 +1,7 @@
 // Adds 2.5x and 3x speeds to YouTube's speed menu
 (function () {
     console.log('[YT Speed Ext] Content script loaded.');
-    const speedsToAdd = [2.5, 3];
+    const speedsToAdd = [4, 8];
     let lastMenu = null;
 
     // Recursively search for .ytp-panel-menu in shadow roots
@@ -43,8 +43,8 @@
             return;
         }
         // Use the last numeric item as the insertion point
-        const insertAfter = numericItems[numericItems.length - 1];
-        console.log('[YT Speed Ext] Will inject after (last numeric):', insertAfter.textContent.trim());
+        const lastNumeric = numericItems[numericItems.length - 1];
+        console.log('[YT Speed Ext] Will inject after (last numeric):', lastNumeric.textContent.trim());
         speedsToAdd.forEach(speed => {
             // Avoid duplicate insertion
             if (speedItems.some(item => {
@@ -54,7 +54,7 @@
                 console.log(`[YT Speed Ext] ${speed}x already present, skipping.`);
                 return;
             }
-            const newBtn = insertAfter.cloneNode(true);
+            const newBtn = lastNumeric.cloneNode(true);
             newBtn.setAttribute('data-custom-speed', speed);
             // Set label
             const labelDiv = newBtn.querySelector('.ytp-menuitem-label');
@@ -72,8 +72,7 @@
                 // Close menu after selection
                 document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'}));
             });
-            insertAfter.parentNode.insertBefore(newBtnClone, insertAfter.nextSibling);
-            insertAfter = newBtnClone;
+            lastNumeric.parentNode.insertBefore(newBtnClone, lastNumeric.nextSibling);
             console.log(`[YT Speed Ext] Injected custom speed: ${speed}x`);
         });
         console.log('[YT Speed Ext] Custom speeds injected into HTML5 player menu.');
