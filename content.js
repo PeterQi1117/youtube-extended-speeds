@@ -1,7 +1,3 @@
-// ==UserScript==
-// @name         YouTube Custom Speeds Injector
-// @description  Adds 2.5x and 3x speeds to YouTube's speed menu
-// ==/UserScript==
 (function () {
     const speedsToAdd = [2.5, 3, 3.5, 4];
     function findMenus(root = document) {
@@ -38,7 +34,6 @@
                 const btnClone = btn.cloneNode(true);
                 btnClone.addEventListener('click', () => {
                     document.querySelectorAll('video').forEach(v => v.playbackRate = speed);
-                    // Find the closest .ytp-panel ancestor and click the back button
                     let panel = menu.closest('.ytp-panel');
                     if (panel) {
                         const backBtn = panel.querySelector('.ytp-panel-header .ytp-panel-back-button');
@@ -51,7 +46,6 @@
             });
         }
         updateCheckmarks(menu, current);
-        // Ensure native 'Normal' is selectable and sets playbackRate to 1
         const normalItem = [...menu.querySelectorAll('.ytp-menuitem')].find(i => i.querySelector('.ytp-menuitem-label')?.textContent.trim() === 'Normal');
         if (normalItem && !normalItem._hasNormalHandler) {
             normalItem.addEventListener('click', () => {
@@ -69,7 +63,6 @@
             const nums = labels.filter(t => /^([0-9.]+|Normal)$/.test(t));
             if (nums.length >= 5 && nums.includes('2')) addSpeeds(menu);
 
-            // Update the parent menu's "Playback speed" value
             menu.querySelectorAll('.ytp-menuitem').forEach(item => {
                 const label = item.querySelector('.ytp-menuitem-label');
                 const content = item.querySelector('.ytp-menuitem-content');
