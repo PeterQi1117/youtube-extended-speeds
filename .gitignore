@@ -1,0 +1,43 @@
+# Python virtual environment
+venv/
+
+# macOS system files
+.DS_Store
+
+# Windows system files
+Thumbs.db
+
+# Editor/project files
+*.swp
+*.swo
+*.sublime-workspace
+*.sublime-project
+.idea/
+.vscode/
+
+# Zone.Identifier (Windows alternate data streams)
+*:Zone.Identifier
+
+# Node/npm
+node_modules/
+
+# Logs
+*.log
+
+# Miscellaneous
+*.bak
+*.tmp
+
+# Compiled Python files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Chrome extension build artifacts (if any)
+dist/
+build/
+
+# Ignore user secrets/configs
+.env
+.env.*
