@@ -46,6 +46,15 @@
             });
         }
         updateCheckmarks(menu, current);
+        // Ensure native 'Normal' is selectable and sets playbackRate to 1
+        const normalItem = [...menu.querySelectorAll('.ytp-menuitem')].find(i => i.querySelector('.ytp-menuitem-label')?.textContent.trim() === 'Normal');
+        if (normalItem && !normalItem._hasNormalHandler) {
+            normalItem.addEventListener('click', () => {
+                document.querySelectorAll('video').forEach(v => v.playbackRate = 1);
+                updateCheckmarks(menu, 1);
+            });
+            normalItem._hasNormalHandler = true;
+        }
     }
     const observer = new MutationObserver(() => {
         const video = document.querySelector('video');
