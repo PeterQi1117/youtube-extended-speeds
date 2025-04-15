@@ -3,7 +3,7 @@
 // @description  Adds 2.5x and 3x speeds to YouTube's speed menu
 // ==/UserScript==
 (function () {
-    const speedsToAdd = [2.5, 3];
+    const speedsToAdd = [2.5, 3, 3.5, 4];
     function findMenus(root = document) {
         let r = []; if (root.querySelectorAll) r = [...root.querySelectorAll('.ytp-panel-menu')];
         if (root.children) for (const el of root.children) if (el.shadowRoot) r.push(...findMenus(el.shadowRoot));
@@ -38,9 +38,14 @@
                 const btnClone = btn.cloneNode(true);
                 btnClone.addEventListener('click', () => {
                     document.querySelectorAll('video').forEach(v => v.playbackRate = speed);
-                    setTimeout(() => {
-                        updateCheckmarks(menu, speed);
-                    }, 50);
+                    // Find the closest .ytp-panel ancestor and click the back button
+                    let panel = menu.closest('.ytp-panel');
+                    if (panel) {
+                        const backBtn = panel.querySelector('.ytp-panel-header .ytp-panel-back-button');
+                        if (backBtn) {
+                            backBtn.click();
+                        }
+                    }
                 });
                 last.parentNode.insertBefore(btnClone, last.nextSibling);
             });
