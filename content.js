@@ -1,7 +1,7 @@
 // Adds 2.5x and 3x speeds to YouTube's speed menu
 (function () {
     console.log('[YT Speed Ext] Content script loaded.');
-    const speedsToAdd = [4, 8];
+    const speedsToAdd = [3, 4];
     let lastMenu = null;
 
     // Recursively search for .ytp-panel-menu in shadow roots
@@ -45,7 +45,7 @@
         // Use the last numeric item as the insertion point
         const lastNumeric = numericItems[numericItems.length - 1];
         console.log('[YT Speed Ext] Will inject after (last numeric):', lastNumeric.textContent.trim());
-        speedsToAdd.forEach(speed => {
+        [...speedsToAdd].reverse().forEach(speed => {
             // Avoid duplicate insertion
             if (speedItems.some(item => {
                 const label = item.querySelector('.ytp-menuitem-label');
@@ -69,8 +69,6 @@
                 // Deselect all
                 submenu.querySelectorAll('.ytp-menuitem').forEach(btn => btn.setAttribute('aria-checked', 'false'));
                 newBtnClone.setAttribute('aria-checked', 'true');
-                // Close menu after selection
-                document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'}));
             });
             lastNumeric.parentNode.insertBefore(newBtnClone, lastNumeric.nextSibling);
         });
