@@ -1,5 +1,15 @@
 (function () {
     const speedsToAdd = [2.5, 3, 3.5, 4];
+    function removeNativeSpeed(menu, speed) {
+        const re = new RegExp(`^${speed}(x)?$`);
+        menu.querySelectorAll('.ytp-menuitem').forEach(item => {
+            if (item.hasAttribute('data-custom-speed')) return;
+            const label = item.querySelector('.ytp-menuitem-label');
+            if (!label) return;
+            const text = label.textContent.trim();
+            if (re.test(text)) item.remove();
+        });
+    }
     function findMenus(root = document) {
         let r = []; if (root.querySelectorAll) r = [...root.querySelectorAll('.ytp-panel-menu')];
         if (root.children) for (const el of root.children) if (el.shadowRoot) r.push(...findMenus(el.shadowRoot));
@@ -21,12 +31,15 @@
     function addSpeeds(menu) {
         const video = document.querySelector('video');
         const current = video ? video.playbackRate : 1;
+
+        removeNativeSpeed(menu, 4);
+
         if (!menu.querySelector('[data-custom-speed]')) {
             const items = [...menu.querySelectorAll('.ytp-menuitem')];
             const nums = items.filter(i => /^([0-9.]+|Normal)$/.test(i.querySelector('.ytp-menuitem-label')?.textContent.trim()));
             const last = nums.at(-1);
             [...speedsToAdd].reverse().forEach(speed => {
-                if (items.some(i => i.querySelector('.ytp-menuitem-label')?.textContent.trim() == String(speed))) return;
+                if ([...menu.querySelectorAll('[data-custom-speed] .ytp-menuitem-label')].some(l => parseFloat(l.textContent) === speed)) return;
                 const btn = last.cloneNode(true);
                 btn.setAttribute('data-custom-speed', speed);
                 btn.querySelector('.ytp-menuitem-label').textContent = String(speed);

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "YouTube Extended Speeds",
-  "version": "1.0",
+  "version": "1.1",
   "description": "Add 2.5x, 3x, 3.5x, and 4x playback speeds to YouTube's speed menu.",
   "content_scripts": [
     {
