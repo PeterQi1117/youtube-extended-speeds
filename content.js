@@ -1,225 +1,209 @@
 (function () {
     const SPEEDS_TO_ADD = [2.5, 3, 3.5, 4];
-    const processedButtonGroups = new WeakSet();
+    const MAX_SPEED = Math.max(...SPEEDS_TO_ADD);
+    const injectedChips = new WeakSet();
 
-    // --- UTILITIES ---
+    // --- Utilities ---
 
     function getText(el) {
-        return (el && el.textContent ? el.textContent : '').trim();
+        return el?.textContent?.trim() || '';
     }
 
     function parseSpeedLabel(text) {
         const t = (text || '').trim();
         if (!t) return null;
         if (t === 'Normal') return 1;
-        const cleaned = t.endsWith('x') ? t.slice(0, -1) : t;
-        const n = parseFloat(cleaned);
-        return (isFinite(n) && n > 0 && n <= 8) ? n : null;
+        const n = parseFloat(t.endsWith('x') ? t.slice(0, -1) : t);
+        return isFinite(n) && n > 0 && n <= 8 ? n : null;
     }
 
     function querySelectorAllDeep(root, selector) {
-        const out = [];
+        const results = [];
         const visited = new Set();
         const stack = [root];
-
         while (stack.length) {
             const node = stack.pop();
-            if (!node || !node.querySelectorAll) continue;
-
-            out.push(...node.querySelectorAll(selector));
-
+            if (!node?.querySelectorAll) continue;
+            results.push(...node.querySelectorAll(selector));
             for (const el of node.querySelectorAll('*')) {
-                if (el && el.shadowRoot && !visited.has(el.shadowRoot)) {
+                if (el?.shadowRoot && !visited.has(el.shadowRoot)) {
                     visited.add(el.shadowRoot);
                     stack.push(el.shadowRoot);
                 }
             }
         }
-        return out;
-    }
-
-    function updateVideoSpeed(speed) {
-        // Fallback for native video element
-        document.querySelectorAll('video').forEach(v => v.playbackRate = speed);
+        return results;
     }
 
     function getVideoSpeed() {
-        const video = document.querySelector('video');
-        return video ? video.playbackRate : 1;
+        return document.querySelector('video')?.playbackRate || 1;
     }
 
-    // --- NEW UI (VARIABLE SPEED PANEL & BUTTON GROUPS) ---
+    function setVideoSpeed(speed) {
+        document.querySelectorAll('video').forEach(v => v.playbackRate = speed);
+    }
 
-    function formatVariableSpeedPreset(speed) {
-        if (!isFinite(speed)) return String(speed);
+    // --- Speed Panel UI ---
+
+    function formatSpeedChip(speed) {
         return Number.isInteger(speed) ? `${speed}.0` : String(speed);
     }
 
-    function updateVariableSpeedPanelDisplay(root, speed) {
-        const value = `${Number(speed).toFixed(2)}x`;
-        const display = root.querySelector('.ytp-variable-speed-panel-display span');
-        if (display) display.textContent = value;
-        const text = root.querySelector('.ytp-speedslider-text');
-        if (text) text.textContent = value;
+    function injectSliderStyles() {
+        if (document.getElementById('yt-ext-speed-styles')) return;
+        const style = document.createElement('style');
+        style.id = 'yt-ext-speed-styles';
+        style.textContent = `
+            .ytp-variable-speed-panel-content .ytp-input-slider,
+            .ytp-variable-speed-panel-content .ytp-input-slider * {
+                transition-duration: 0s !important;
+            }
+            .ytp-variable-speed-panel-content .ytp-input-slider {
+                --yt-slider-shape-gradient-percent: var(--ext-speed-pct) !important;
+            }
+        `;
+        document.head.appendChild(style);
     }
 
-    function addSpeedsToVariableSpeedChips(chips) {
-        const current = getVideoSpeed();
-        
-        // Remove existing premium 3.0x button if present to save space
-        const premiumUpsell = chips.querySelector('.ytp-variable-speed-panel-premium-upsell-icon');
-        if (premiumUpsell) {
-            const premiumWrapper = premiumUpsell.closest('.ytp-variable-speed-panel-preset-button-wrapper');
-            if (premiumWrapper) premiumWrapper.remove();
-        }
+    function syncSlider(panel, speed) {
+        const slider = panel.querySelector('.ytp-input-slider');
+        if (!slider) return;
+        const min = parseFloat(slider.getAttribute('min')) || 0.25;
+        slider.setAttribute('max', String(MAX_SPEED));
+        slider.value = String(speed);
+        slider.setAttribute('aria-valuenow', String(speed));
+        slider.setAttribute('aria-valuetext', `${Number(speed).toFixed(2)}x`);
+        const pct = ((speed - min) / (MAX_SPEED - min)) * 100;
+        slider.style.setProperty('--ext-speed-pct',
+            `${Math.max(0, Math.min(100, pct))}%`);
+    }
 
-        const currentWrappers = [...chips.querySelectorAll('.ytp-variable-speed-panel-preset-button-wrapper')];
-        if (currentWrappers.length === 0) return;
+    function syncPanelUI(panel, speed) {
+        const label = `${Number(speed).toFixed(2)}x`;
 
-        const existing = new Set(
-            currentWrappers
+        const display = panel.querySelector('.ytp-variable-speed-panel-display span');
+        if (display) display.textContent = label;
+        const sliderText = panel.querySelector('.ytp-speedslider-text');
+        if (sliderText) sliderText.textContent = label;
+
+        syncSlider(panel, speed);
+    }
+
+    // --- Chip Injection ---
+
+    function injectCustomSpeeds(chips) {
+        if (injectedChips.has(chips)) return;
+
+        // Remove premium 3.0x upsell button
+        chips.querySelector('.ytp-variable-speed-panel-premium-upsell-icon')
+            ?.closest('.ytp-variable-speed-panel-preset-button-wrapper')
+            ?.remove();
+
+        const wrappers = [...chips.querySelectorAll('.ytp-variable-speed-panel-preset-button-wrapper')];
+        if (wrappers.length === 0) return;
+
+        const existingSpeeds = new Set(
+            wrappers
                 .map(w => parseSpeedLabel(getText(w.querySelector('button span')) || getText(w.querySelector('button'))))
                 .filter(v => v != null)
         );
+        if (existingSpeeds.size < 2) return;
 
-        if (existing.size < 2) return;
+        const template = wrappers.find(w => w.getAttribute('aria-hidden') !== 'true') || wrappers[0];
+        if (!template.querySelector('button')) return;
 
-        const templateWrapper = currentWrappers.find(w => w.getAttribute('aria-hidden') !== 'true') || currentWrappers[0];
-        const templateButton = templateWrapper.querySelector('button');
-        if (!templateButton) return;
-
-        // Force chips container to wrap onto a new row instead of resizing the whole menu popup
-        chips.style.flexWrap = 'wrap';
-        chips.style.height = 'auto';
-        chips.style.justifyContent = 'flex-start';
-        chips.style.gap = '8px'; // Add some spacing between rows/items
-        chips.style.paddingBottom = '16px'; // Add padding below the buttons
-        
-        const contentPanel = chips.closest('.ytp-variable-speed-panel-content');
-        if (contentPanel) {
-            contentPanel.style.height = 'auto';
-            contentPanel.style.minHeight = '230px'; // Original was 193px
-        }
-        
+        const panel = chips.closest('.ytp-variable-speed-panel-content');
         const popup = chips.closest('.ytp-popup');
-        const panel = chips.closest('.ytp-panel');
-        
-        // Increase height slightly to fit the wrapped buttons
-        if (popup && popup.style.height) {
-            const currentHeight = parseInt(popup.style.height, 10);
-            if (currentHeight < 320) popup.style.height = '320px'; // Original was 250px
+        const ytPanel = chips.closest('.ytp-panel');
+
+        // Wrap chips onto a second row
+        Object.assign(chips.style, {
+            flexWrap: 'wrap', height: 'auto', justifyContent: 'flex-start',
+            gap: '8px', paddingBottom: '16px',
+        });
+        if (panel) Object.assign(panel.style, { height: 'auto', minHeight: '230px' });
+
+        // Grow popup/panel to fit the extra row
+        for (const el of [popup, ytPanel]) {
+            if (el?.style.height && parseInt(el.style.height, 10) < 320) el.style.height = '320px';
         }
-        if (panel && panel.style.height) {
-            const currentHeight = parseInt(panel.style.height, 10);
-            if (currentHeight < 320) panel.style.height = '320px';
-        }
-        
-        // Restore height when navigating back to main menu
-        if (panel) {
-            const backBtn = panel.querySelector('.ytp-panel-back-button');
-            if (backBtn && !backBtn._hasHeightResetHandler) {
+
+        // Restore original height when navigating back to the main settings menu
+        if (ytPanel) {
+            const backBtn = ytPanel.querySelector('.ytp-panel-back-button');
+            if (backBtn && !backBtn._backHandler) {
                 backBtn.addEventListener('click', () => {
-                    if (popup) popup.style.height = '250px';
-                    if (panel) panel.style.height = '250px';
+                    for (const el of [popup, ytPanel]) if (el) el.style.height = '250px';
                 });
-                backBtn._hasHeightResetHandler = true;
+                backBtn._backHandler = true;
             }
         }
 
+        // Add custom speed chips
         for (const speed of SPEEDS_TO_ADD) {
-            if (existing.has(speed) || chips.querySelector(`[data-custom-speed="${String(speed)}"]`)) continue;
+            if (existingSpeeds.has(speed)) continue;
 
-            const wrapper = templateWrapper.cloneNode(true);
+            const wrapper = template.cloneNode(true);
             wrapper.setAttribute('aria-hidden', 'false');
             wrapper.style.display = '';
             wrapper.style.order = String(Math.floor(speed * 100));
 
-            const button = wrapper.querySelector('button');
-            button.setAttribute('data-custom-speed', String(speed));
+            const btn = wrapper.querySelector('button');
+            btn.setAttribute('data-custom-speed', String(speed));
+            btn.querySelector('.ytp-variable-speed-panel-premium-upsell-icon')?.remove();
 
-            const upsell = button.querySelector('.ytp-variable-speed-panel-premium-upsell-icon');
-            if (upsell) upsell.remove();
+            const span = btn.querySelector('span') || btn.appendChild(document.createElement('span'));
+            span.textContent = formatSpeedChip(speed);
+            wrapper.querySelector('.ytp-variable-speed-panel-preset-button-label-text')?.remove();
 
-            const span = button.querySelector('span') || button.appendChild(document.createElement('span'));
-            span.textContent = formatVariableSpeedPreset(speed);
-
-            const label = wrapper.querySelector('.ytp-variable-speed-panel-preset-button-label-text');
-            if (label) label.remove();
-
-            button.addEventListener('click', () => {
-                updateVideoSpeed(speed);
-                if (contentPanel) updateVariableSpeedPanelDisplay(contentPanel, speed);
-
-                if (contentPanel) {
-                    const slider = contentPanel.querySelector('.ytp-input-slider');
-                    if (slider) {
-                        const max = parseFloat(slider.getAttribute('max')) || 2;
-                        slider.value = String(max);
-                        slider.setAttribute('aria-valuenow', String(max));
-                        slider.setAttribute('aria-valuetext', String(max));
-                        slider.style.setProperty('--yt-slider-shape-gradient-percent', '100%');
-                        slider.dispatchEvent(new Event('input', { bubbles: true }));
-                        slider.dispatchEvent(new Event('change', { bubbles: true }));
-                    }
-                }
+            btn.addEventListener('click', () => {
+                // Defer so our speed wins over YouTube's internal clamping handlers
+                setTimeout(() => {
+                    setVideoSpeed(speed);
+                    if (panel) syncPanelUI(panel, speed);
+                }, 0);
             });
 
             chips.appendChild(wrapper);
         }
 
-        if (contentPanel) updateVariableSpeedPanelDisplay(contentPanel, current);
-        
-        // Fix 4x -> 2x issue: We need to override the native buttons so they also force updateVideoSpeed.
-        // YouTube's native UI gets confused when the video speed is > 2 (the slider max).
-        // By adding click listeners to native buttons, we ensure they reset the speed correctly.
-        currentWrappers.forEach(w => {
+        // Intercept native chip clicks to keep slider/display in sync after custom speeds
+        for (const w of wrappers) {
             const btn = w.querySelector('button');
-            if (!btn || btn.hasAttribute('data-custom-speed') || btn._hasCustomClickHandler) return;
-            
-            const speed = parseSpeedLabel(getText(btn.querySelector('span')) || getText(btn));
-            if (speed != null) {
+            if (!btn || btn.hasAttribute('data-custom-speed') || btn._speedHandler) continue;
+            const s = parseSpeedLabel(getText(btn.querySelector('span')) || getText(btn));
+            if (s != null) {
                 btn.addEventListener('click', () => {
-                    updateVideoSpeed(speed);
+                    setTimeout(() => {
+                        setVideoSpeed(s);
+                        if (panel) syncPanelUI(panel, s);
+                    }, 0);
                 });
-                btn._hasCustomClickHandler = true;
+                btn._speedHandler = true;
             }
-        });
-    }
-
-    function handleNewSpeedUI(settingsMenu) {
-        const chipsContainers = querySelectorAllDeep(settingsMenu, '.ytp-variable-speed-panel-chips');
-        
-        for (const chips of chipsContainers) {
-            if (!processedButtonGroups.has(chips)) {
-                processedButtonGroups.add(chips);
-            }
-            addSpeedsToVariableSpeedChips(chips);
         }
+
+        // Kill slider transition so our gradient updates are instant
+        injectSliderStyles();
+
+        // Show current speed on first render
+        if (panel) syncPanelUI(panel, getVideoSpeed());
+
+        injectedChips.add(chips);
     }
 
-    // --- MAIN OBSERVER ---
+    // --- Observer ---
 
     let scheduled = false;
     const observer = new MutationObserver(() => {
         if (scheduled) return;
         scheduled = true;
-        
         requestAnimationFrame(() => {
             scheduled = false;
-            const players = [...document.querySelectorAll('.html5-video-player')];
-            if (players.length === 0) players.push(document.body);
-            
-            for (const player of players) {
-                // New UI settings menus (can be attached to player or document body)
-                const settingsMenus = [
-                    ...querySelectorAllDeep(player, '.ytp-settings-menu'),
-                    ...querySelectorAllDeep(document.body, '.ytp-popup.ytp-settings-menu')
-                ];
-                
-                // Deduplicate menus
-                const uniqueMenus = [...new Set(settingsMenus)];
-                for (const menu of uniqueMenus) {
-                    handleNewSpeedUI(menu);
+            const menus = new Set(querySelectorAllDeep(document.body, '.ytp-settings-menu'));
+            for (const menu of menus) {
+                for (const chips of querySelectorAllDeep(menu, '.ytp-variable-speed-panel-chips')) {
+                    injectCustomSpeeds(chips);
                 }
             }
         });
